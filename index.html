@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pulse – Your WHOOP Metrics</title>
+<style>
+:root{--bg:#0b0d10;--card:#151a20;--line:#252c35;--tx:#f2f5f7;--mu:#8d98a5;--g:#2fe07a;--y:#ffd23f;--r:#ff4d5e;--b:#3ea6ff;--p:#a78bfa;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f3f5f7;--card:#fff;--line:#dfe4e9;--tx:#11161b;--mu:#667381;--g:#12a94f;--y:#d99a00;--r:#e0293c;--b:#1a78d1;--p:#7c5ce0}}
+:root[data-theme="light"]{--bg:#f3f5f7;--card:#fff;--line:#dfe4e9;--tx:#11161b;--mu:#667381;--g:#12a94f;--y:#d99a00;--r:#e0293c;--b:#1a78d1;--p:#7c5ce0}
+*{box-sizing:border-box}html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100%}
+.wrap{max-width:760px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+h1{font-size:20px;margin:0;letter-spacing:.5px}h1 span{color:var(--g)}
+.sub{color:var(--mu);font-size:12px}
+button,.btn{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px;cursor:pointer}
+button.on{background:var(--tx);color:var(--bg)}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.rings{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.ring{position:relative}.ring svg{width:100%;max-width:130px;transform:rotate(-90deg)}
+.ring .v{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .v b{font-size:24px}.ring .v i{font-style:normal;font-size:11px;color:var(--mu)}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mu);margin-top:4px}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:560px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.tile b{font-size:20px;display:block;margin-top:4px}.tile small{color:var(--mu);font-size:11px}
+.ch h3{margin:0;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
+.ch h3 em{font-style:normal;color:var(--mu);font-size:11px;font-weight:400}
+.ch svg{width:100%;height:90px;margin-top:8px;display:block}
+.bar{display:flex;height:16px;border-radius:8px;overflow:hidden;margin:10px 0}
+.leg{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--mu)}.leg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
+.note{font-size:12px;color:var(--mu);line-height:1.5}
+.scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+ <div><h1>PULSE<span>●</span></h1><div class="sub" id="src">Demo data</div></div>
+ <div class="row" style="margin:0">
+  <label class="btn" for="f">Import WHOOP CSV</label><input id="f" type="file" accept=".csv" hidden>
+  <button id="demo">Demo</button>
+ </div>
+</header>
+<div class="row" id="rng"></div>
+<div id="app"></div>
+<div class="card note" id="help">
+ <b>Load your real data:</b> WHOOP app → Menu → Data Export (or app.whoop.com → My Data) → request your export, then import <b>physiological_cycles.csv</b> here. Everything is processed in your browser — nothing is uploaded.
+</div>
+</div>
+<script>
+var $=function(s){return document.querySelector(s)};
+var DATA=[],RANGE=14;
+function parseCSV(t){var rows=[],r=[],c='',q=false;for(var i=0;i<t.length;i++){var ch=t[i];if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=ch}else if(ch=='"')q=true;else if(ch==','){r.push(c);c=''}else if(ch=='\n'||ch=='\r'){if(ch=='\r'&&t[i+1]=='\n')i++;r.push(c);rows.push(r);r=[];c=''}else c+=ch}if(c||r.length){r.push(c);rows.push(r)}return rows}
+function fromCSV(text){
+ var rows=parseCSV(text).filter(function(r){return r.length>3});if(rows.length<2)return[];
+ var h=rows[0].map(function(x){return x.trim().toLowerCase()});
+ function ix(){for(var k=0;k<arguments.length;k++){var j=h.findIndex(function(x){return x.indexOf(arguments[k])===0}.bind(null));}return -1}
+ function find(keys){for(var k=0;k<keys.length;k++){for(var j=0;j<h.length;j++){if(h[j].indexOf(keys[k])===0)return j}}return -1}
+ var m={rec:find(['recovery score']),rhr:find(['resting heart']),hrv:find(['heart rate variability']),strain:find(['day strain']),perf:find(['sleep performance']),asleep:find(['asleep duration']),light:find(['light sleep']),deep:find(['deep (sws)']),rem:find(['rem duration']),awake:find(['awake duration']),resp:find(['respiratory']),spo2:find(['blood oxygen']),temp:find(['skin temp']),cal:find(['energy burned']),eff:find(['sleep efficiency']),cons:find(['sleep consistency']),debt:find(['sleep debt']),wake:find(['wake onset']),start:find(['cycle start'])};
+ var out=[];
+ rows.slice(1).forEach(function(r){
+  function n(k){if(m[k]<0)return null;var v=parseFloat(r[m[k]]);return isNaN(v)?null:v}
+  var d=((m.wake>=0&&r[m.wake])||(m.start>=0&&r[m.start])||'').slice(0,10);if(!d)return;
+  out.push({date:d,rec:n('rec'),rhr:n('rhr'),hrv:n('hrv'),strain:n('strain'),perf:n('perf'),asleep:n('asleep'),light:n('light'),deep:n('deep'),rem:n('rem'),awake:n('awake'),resp:n('resp'),spo2:n('spo2'),temp:n('temp'),cal:n('cal'),eff:n('eff'),cons:n('cons'),debt:n('debt')});
+ });
+ out.sort(function(a,b){return a.date<b.date?-1:1});return out;
+}
+function demo(){
+ var s=7,o=[];function rnd(){s=(s*9301+49297)%233280;return s/233280}
+ for(var i=44;i>=0;i--){var d=new Date(Date.now()-i*864e5).toISOString().slice(0,10);
+  var hrv=Math.round(55+rnd()*40),rec=Math.min(99,Math.max(8,Math.round(hrv-18+rnd()*35)));
+  var tot=Math.round(380+rnd()*120),deep=Math.round(tot*(.14+rnd()*.06)),rem=Math.round(tot*(.2+rnd()*.06));
+  o.push({date:d,rec:rec,rhr:Math.round(48+rnd()*10),hrv:hrv,strain:+(6+rnd()*12).toFixed(1),perf:Math.round(70+rnd()*28),asleep:tot,deep:deep,rem:rem,light:tot-deep-rem,awake:Math.round(25+rnd()*35),resp:+(14.5+rnd()*2).toFixed(1),spo2:Math.round(95+rnd()*3),temp:+(33.5+rnd()).toFixed(1),cal:Math.round(1900+rnd()*1200),eff:Math.round(86+rnd()*10),cons:Math.round(60+rnd()*35),debt:Math.round(rnd()*70)})}
+ return o;
+}
+function hm(m){if(m==null)return'–';return Math.floor(m/60)+'h '+Math.round(m%60)+'m'}
+function f(v,u,d){return v==null?'–':(d!=null?v.toFixed(d):Math.round(v))+(u||'')}
+function avg(a){a=a.filter(function(x){return x!=null});return a.length?a.reduce(function(x,y){return x+y},0)/a.length:null}
+function recCol(v){return v==null?'var(--mu)':v>=67?'var(--g)':v>=34?'var(--y)':'var(--r)'}
+function ring(pct,col,val,sub,label){var C=276.46,p=Math.max(0,Math.min(1,(pct||0)));
+ return '<div class="ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="var(--line)" stroke-width="8"/><circle cx="50" cy="50" r="44" fill="none" stroke="'+col+'" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+(C*(1-p))+'"/></svg><div class="v"><b>'+val+'</b><i>'+sub+'</i></div><div class="lbl">'+label+'</div></div>'}
+function chart(title,rows,key,col,unit,dec,conv){
+ var v=rows.map(function(r){var x=r[key];return x==null?null:(conv?conv(x):x)});
+ var ok=v.filter(function(x){return x!=null});
+ if(!ok.length)return '<div class="card ch"><h3>'+title+'<em>no data</em></h3></div>';
+ var mn=Math.min.apply(null,ok),mx=Math.max.apply(null,ok);if(mx==mn){mx+=1;mn-=1}
+ var W=300,H=90,pad=6,pts=[],n=v.length;
+ v.forEach(function(x,i){if(x==null)return;pts.push([(n>1?i/(n-1):.5)*(W-2*pad)+pad,H-pad-((x-mn)/(mx-mn))*(H-2*pad)])});
+ var line=pts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1)}).join(' ');
+ var last=pts[pts.length-1],a=avg(ok),l=ok[ok.length-1];
+ return '<div class="card ch"><h3>'+title+'<em>avg '+a.toFixed(dec)+unit+' · latest <span style="color:'+col+'">'+l.toFixed(dec)+unit+'</span></em></h3><svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none"><polyline points="'+line+'" fill="none" stroke="'+col+'" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/><circle cx="'+last[0]+'" cy="'+last[1]+'" r="3.5" fill="'+col+'"/></svg></div>'}
+function tile(l,v,s){return '<div class="tile"><small>'+l+'</small><b>'+v+'</b><small>'+(s||'')+'</small></div>'}
+function render(){
+ var rows=DATA.slice(-RANGE),t=rows[rows.length-1];
+ if(!t){$('#app').innerHTML='<div class="card note">No rows found. Make sure you imported physiological_cycles.csv.</div>';return}
+ var h='<div class="card"><div class="sub" style="margin-bottom:8px">'+t.date+'</div><div class="rings">'+
+  ring((t.rec||0)/100,recCol(t.rec),f(t.rec,'%'),'ready','Recovery')+
+  ring((t.strain||0)/21,'var(--b)',f(t.strain,'',1),'of 21','Strain')+
+  ring((t.perf||0)/100,'var(--p)',f(t.perf,'%'),hm(t.asleep),'Sleep')+'</div></div>';
+ h+='<div class="tiles" style="margin-bottom:12px">'+
+  tile('HRV',f(t.hrv,' ms'),'7d avg '+f(avg(DATA.slice(-7).map(function(r){return r.hrv})),' ms'))+
+  tile('Resting HR',f(t.rhr,' bpm'),'7d avg '+f(avg(DATA.slice(-7).map(function(r){return r.rhr})),' bpm'))+
+  tile('Respiratory',f(t.resp,' rpm',1))+tile('Blood O₂',f(t.spo2,'%'))+
+  tile('Skin temp',f(t.temp,' °C',1))+tile('Calories',f(t.cal,' kcal'))+
+  tile('Sleep efficiency',f(t.eff,'%'),'consistency '+f(t.cons,'%'))+tile('Sleep debt',hm(t.debt))+'</div>';
+ var st=[['Deep','deep','var(--p)'],['REM','rem','var(--b)'],['Light','light','var(--mu)'],['Awake','awake','var(--r)']],tot=0;
+ st.forEach(function(s){tot+=t[s[1]]||0});
+ if(tot){h+='<div class="card"><div class="lbl" style="margin:0">Last night’s sleep · '+hm(t.asleep)+'</div><div class="bar">'+
+  st.map(function(s){return '<div style="width:'+((t[s[1]]||0)/tot*100)+'%;background:'+s[2]+'"></div>'}).join('')+'</div><div class="leg">'+
+  st.map(function(s){return '<span><i style="background:'+s[2]+'"></i>'+s[0]+' '+hm(t[s[1]])+'</span>'}).join('')+'</div></div>'}
+ h+=chart('Recovery',rows,'rec','var(--g)','%',0)+chart('Strain',rows,'strain','var(--b)','',1)+
+  chart('HRV',rows,'hrv','var(--p)',' ms',0)+chart('Resting heart rate',rows,'rhr','var(--r)',' bpm',0)+
+  chart('Sleep duration',rows,'asleep','var(--y)','h',1,function(x){return x/60});
+ $('#app').innerHTML=h;
+ [].forEach.call(document.querySelectorAll('#rng button'),function(b){b.className=(+b.dataset.r===RANGE)?'on':''});
+}
+$('#rng').innerHTML=[7,14,30].map(function(r){return '<button data-r="'+r+'">'+r+' days</button>'}).join('');
+$('#rng').onclick=function(e){var r=e.target.dataset&&e.target.dataset.r;if(r){RANGE=+r;render()}};
+$('#demo').onclick=function(){DATA=demo();$('#src').textContent='Demo data';render()};
+$('#f').onchange=function(e){var file=e.target.files[0];if(!file)return;var rd=new FileReader();
+ rd.onload=function(){var d=fromCSV(String(rd.result));if(d.length){DATA=d;$('#src').textContent=file.name+' · '+d.length+' days'}else{$('#src').textContent='Couldn’t read that file'}render()};rd.readAsText(file)};
+DATA=demo();render();
+fetch('/api/metrics').then(function(r){if(r.status==401){location='/login';return null}return r.json()}).then(function(d){if(d&&d.length){DATA=d;$('#src').textContent='WHOOP · live sync';$('#help').style.display='none';render()}}).catch(function(){});
+</script>
+</body>
+</html>
